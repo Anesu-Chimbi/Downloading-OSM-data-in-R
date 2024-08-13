@@ -8,6 +8,14 @@ library(rmapshaper)
 library(sf)
 library(leaflet)
 library(webshot)
+library(ggplot2)    # For enhanced map features
+library(ggspatial)  # For adding north arrow and scale bar
+library(ggplot2)    # For enhanced map features
+library(ggspatial)  # For adding north arrow and scale bar
+library(mapview)    # For saving maps
+library(htmlwidgets)
+install.packages("ggspatial")
+
 
 # Define a smaller bounding box for a specific region in Zimbabwe
 Zimbabwe_bbox_small <- getbb("Harare, Zimbabwe")
@@ -37,16 +45,17 @@ st_write(zw_water_sf_simple, "C:/Users/anesu/Documents/R 2024/Downloading-OSM-da
 zw_water_sf_simple$area <- st_area(zw_water_sf_simple)
 summary(zw_water_sf_simple$area)
 
+
 # Create an interactive map with leaflet
-water_map <- leaflet(data = zw_water_sf_simple) %>%
+water_map_leaflet <- leaflet(data = zw_water_sf_simple) %>%
   addTiles() %>%
   addPolygons(
     color = "blue",
-    fillColor = "lightblue",  # Changed for better visibility
+    fillColor = "lightblue",
     fillOpacity = 0.5,
-    weight = 2,               # Line thickness
+    weight = 2,
     popup = ~paste("Area:", round(area, 2), "square meters"),
-    group = "Water Bodies"    # Group for legend
+    group = "Water Bodies"
   ) %>%
   addLegend(
     position = "bottomright",
@@ -55,6 +64,56 @@ water_map <- leaflet(data = zw_water_sf_simple) %>%
     title = "Legend"
   ) %>%
   addScaleBar(position = "bottomleft")
+
+# Save the interactive map as an HTML file
+saveWidget(water_map_leaflet, "docs/water_map_interactive.html")
+
+# Convert to a data frame for ggplot
+water_df <- as.data.frame(st_coordinates(st_centroid(zw_water_sf_simple)))
+
+# Create a static map with ggplot
+water_map_ggplot <- ggplot(data = zw_water_sf_simple) +
+  geom_sf(fill = "lightblue", color = "blue", size = 0.5) +
+  coord_sf() +
+  annotation_scale(location = "bl", width_hint = 0.5) +
+  annotation_north_arrow(location = "tl", which_north = "true") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "gray80"),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 12)
+  ) +
+  labs(title = "Water Bodies in Harare, Zimbabwe", x = "Longitude", y = "Latitude")
+
+# Save the static map as a PNG file
+ggsave(filename = "docs/water_map_complete.png", plot = water_map_ggplot, width = 10, height = 8, dpi = 300)
+
+
+
+
+
+
+
+
+
+
+
+# Create a static map with ggplot
+water_map_ggplot <- ggplot(data = zw_water_sf_simple) +
+  geom_sf(fill = "lightblue", color = "blue", size = 0.5) +
+  coord_sf() +
+  annotation_scale(location = "bl", width_hint = 0.5) +
+  annotation_north_arrow(location = "tl", which_north = "true") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "gray80"),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 12)
+  ) +
+  labs(title = "Water Bodies in Harare, Zimbabwe", x = "Longitude", y = "Latitude")
+# Save the map as a PNG file
+ggsave(filename = "docs/water_map_complete.png", plot = water_map_ggplot, width = 10, height = 8, dpi = 300)
+
 
 # Save the interactive map as a PNG file
 mapshot(water_map, file = "docs/water_map.png", vwidth = 1000, vheight = 800)

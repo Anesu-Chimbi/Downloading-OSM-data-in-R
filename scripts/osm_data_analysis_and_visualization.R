@@ -7,6 +7,15 @@ library(mapview)
 library(rmapshaper)
 library(sf)
 library(leaflet)
+library(webshot)
+library(ggplot2)    # For enhanced map features
+library(ggspatial)  # For adding north arrow and scale bar
+library(ggplot2)    # For enhanced map features
+library(ggspatial)  # For adding north arrow and scale bar
+library(mapview)    # For saving maps
+library(htmlwidgets)
+library(ggspatial)
+
 
 # Define a smaller bounding box for a specific region in Zimbabwe
 Zimbabwe_bbox_small <- getbb("Harare, Zimbabwe")
@@ -36,16 +45,17 @@ st_write(zw_water_sf_simple, "C:/Users/anesu/Documents/R 2024/Downloading-OSM-da
 zw_water_sf_simple$area <- st_area(zw_water_sf_simple)
 summary(zw_water_sf_simple$area)
 
+
 # Create an interactive map with leaflet
-leaflet(data = zw_water_sf_simple) %>%
+water_map_leaflet <- leaflet(data = zw_water_sf_simple) %>%
   addTiles() %>%
   addPolygons(
     color = "blue",
-    fillColor = "lightblue",  # Changed for better visibility
+    fillColor = "lightblue",
     fillOpacity = 0.5,
-    weight = 2,               # Line thickness
+    weight = 2,
     popup = ~paste("Area:", round(area, 2), "square meters"),
-    group = "Water Bodies"    # Group for legend
+    group = "Water Bodies"
   ) %>%
   addLegend(
     position = "bottomright",
@@ -54,3 +64,7 @@ leaflet(data = zw_water_sf_simple) %>%
     title = "Legend"
   ) %>%
   addScaleBar(position = "bottomleft")
+
+# Save the interactive map as an HTML file
+saveWidget(water_map_leaflet, "/Users/anesu/Documents/R 2024/Downloading-OSM-data-in-R/docs/water_map_interactive.html")
+
