@@ -1,4 +1,3 @@
-
 # Load necessary libraries
 library(httr2)
 library(osmdata)
@@ -8,14 +7,13 @@ library(rmapshaper)
 library(sf)
 library(leaflet)
 library(webshot)
-library(ggplot2)    # For enhanced map features
-library(ggspatial)  # For adding north arrow and scale bar
-library(ggplot2)    # For enhanced map features
-library(ggspatial)  # For adding north arrow and scale bar
-library(mapview)    # For saving maps
+library(ggplot2)    
+library(ggspatial)  
+library(ggplot2)    
+library(ggspatial)  
+library(mapview)    
 library(htmlwidgets)
 library(ggspatial)
-
 
 # Define a smaller bounding box for a specific region in Zimbabwe
 Zimbabwe_bbox_small <- getbb("Harare, Zimbabwe")
@@ -41,7 +39,7 @@ mapview(zw_water_sf_simple, layer.name = "Water Bodies")
 st_write(zw_water_sf_simple, "C:/Users/anesu/Documents/R 2024/Downloading-OSM-data-in-R/data/zw_water_sf_simple.shp")
 st_write(zw_water_sf_simple, "C:/Users/anesu/Documents/R 2024/Downloading-OSM-data-in-R/data/zw_water_sf_simple.geojson")
 
-# Perform basic analysis: Calculate the area of water bodies
+#Calculate the area of water bodies
 zw_water_sf_simple$area <- st_area(zw_water_sf_simple)
 summary(zw_water_sf_simple$area)
 
