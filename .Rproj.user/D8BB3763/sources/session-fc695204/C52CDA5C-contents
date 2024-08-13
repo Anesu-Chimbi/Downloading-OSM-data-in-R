@@ -7,6 +7,7 @@ library(mapview)
 library(rmapshaper)
 library(sf)
 library(leaflet)
+library(webshot)
 
 # Define a smaller bounding box for a specific region in Zimbabwe
 Zimbabwe_bbox_small <- getbb("Harare, Zimbabwe")
@@ -37,7 +38,7 @@ zw_water_sf_simple$area <- st_area(zw_water_sf_simple)
 summary(zw_water_sf_simple$area)
 
 # Create an interactive map with leaflet
-leaflet(data = zw_water_sf_simple) %>%
+water_map <- leaflet(data = zw_water_sf_simple) %>%
   addTiles() %>%
   addPolygons(
     color = "blue",
@@ -54,3 +55,6 @@ leaflet(data = zw_water_sf_simple) %>%
     title = "Legend"
   ) %>%
   addScaleBar(position = "bottomleft")
+
+# Save the interactive map as a PNG file
+mapshot(water_map, file = "docs/water_map.png", vwidth = 1000, vheight = 800)

@@ -3,9 +3,9 @@
     "path": "~/R 2024/Downloading-OSM-data-in-R/scripts/osm_data_analysis_and_visualization.R",
     "project_path": "scripts/osm_data_analysis_and_visualization.R",
     "type": "r_source",
-    "hash": "3775226119",
+    "hash": "1045255537",
     "contents": "",
-    "dirty": false,
+    "dirty": true,
     "created": 1723516656165.0,
     "source_on_save": false,
     "relative_order": 1,
@@ -13,15 +13,15 @@
         "tempName": "Untitled1",
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "29,0",
-        "scrollLine": "23"
+        "cursorPosition": "0,0",
+        "scrollLine": "0"
     },
     "folds": "",
     "lastKnownWriteTime": 1723516939,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1723516939644,
+    "last_content_update": 1723517674340,
     "read_only": false,
     "read_only_alternatives": []
 }
