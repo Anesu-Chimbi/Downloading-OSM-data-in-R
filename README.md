@@ -2,7 +2,7 @@
 
 ## Description
 
-This project demonstrates how to download, process, and analyze OpenStreetMap (OSM) data directly within R, using Harare, Zimbabwe as an example. It includes a script for fetching OSM data, processing it to extract water bodies, and visualizing the data with an interactive map
+This project demonstrates how to download, process, and analyze OpenStreetMap (OSM) data directly within R, using Harare, Zimbabwe as an example. It includes a script for fetching OSM data, processing it to extract water bodies, and visualizing the data with an interactive map.
 
 ![Screenshot 2024-08-13 065302](https://github.com/user-attachments/assets/72f5c6fb-b730-4c3c-970c-400bce2344b4)
 
