@@ -1,10 +1,12 @@
 # OSM Data Download and Analysis in R
 
 ## Description
+This project demonstrates how to download, process, and analyze OpenStreetMap (OSM) data directly within R. It provides both a script for fetching OSM data and a Shiny app for interactive visualization. Using Harare, Zimbabwe as an example, this toolkit allows users to extract, analyze, and visualize water bodies from OSM data.
 
-This project demonstrates how to download, process, and analyze OpenStreetMap (OSM) data directly within R, using Harare, Zimbabwe as an example. It includes a script for fetching OSM data, processing it to extract water bodies, and visualizing the data with an interactive map.
+The Shiny app provides an interactive interface for users to explore water features in any specified area and download the map or data for further use.
 
-![Screenshot 2024-08-13 065302](https://github.com/user-attachments/assets/72f5c6fb-b730-4c3c-970c-400bce2344b4)
+![image](https://github.com/user-attachments/assets/a1c34b2f-94cb-4bec-b2d1-cd3e98fd0f41)
+
 
 ## Features
 
@@ -12,7 +14,12 @@ This project demonstrates how to download, process, and analyze OpenStreetMap (O
 - **Process and Analyze Data:** Extracts water body features, simplifies geometries for faster rendering, and calculates areas.
 - **Interactive Visualization:** Creates interactive maps with `leaflet`, featuring water bodies, legends, and scale bars.
 - **Data Storage:** Saves processed water data as shapefiles and GeoJSON files.
-
+  
+## Shiny App
+- **Interactive Visualization:** Creates an interactive map using leaflet, showing water bodies, legends, and scale bars for any specified location.
+- **User-friendly Interface:** Allows users to input a location and view water bodies on the map.
+- **Data Export Options:** Provides options to download the displayed map as an HTML file or the data as a CSV.
+- **Real-time Processing:** Automatically fetches and processes data from OSM based on user input.
 ## Installation
 
 To use this project, ensure you have the required R packages installed. You can install them using the following commands:
