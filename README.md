@@ -10,7 +10,7 @@ The Shiny app provides an interactive interface for users to explore water featu
 
 ## Features
 
-- **Download OSM Data:** Fetches OSM data specifically for the Harare area in Zimbabwe.
+- **Download OSM Data:** Fetches OSM data for requested areas.
 - **Process and Analyze Data:** Extracts water body features, simplifies geometries for faster rendering, and calculates areas.
 - **Interactive Visualization:** Creates interactive maps with `leaflet`, featuring water bodies, legends, and scale bars.
 - **Data Storage:** Saves processed water data as shapefiles and GeoJSON files.
