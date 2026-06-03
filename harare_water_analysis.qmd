@@ -1,0 +1,423 @@
+---
+title: "Harare Water Bodies — Spatial Analysis Journal"
+subtitle: "Exploratory analysis of OpenStreetMap hydrological features"
+author: "Anesu Chimbi"
+date: "2025-06-03"
+format:
+  html:
+    theme:
+      dark: [darkly, custom.scss]
+    toc: true
+    toc-depth: 3
+    toc-title: "Contents"
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    fig-align: center
+    fig-width: 9
+    fig-height: 5.5
+    embed-resources: true
+    smooth-scroll: true
+    highlight-style: github-dark
+    css: custom.scss
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+```{r setup, include=FALSE}
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+library(leaflet.extras)
+library(plotly)
+library(DT)
+library(rmapshaper)
+library(units)
+library(spdep)
+library(osmdata)
+
+# ── Colour palette ─────────────────────────────────────────
+BG    <- "#0f172a"
+CARD  <- "#1e293b"
+BLUE  <- "#38bdf8"
+CYAN  <- "#22d3ee"
+GREN  <- "#22c55e"
+PURP  <- "#818cf8"
+AMBE  <- "#f59e0b"
+TEXT  <- "#94a3b8"
+
+WATER_COL <- c(lake = BLUE, reservoir = CYAN, wetland = GREN, pond = PURP)
+TYPE_COL  <- c(`Natural Water` = BLUE, Reservoir = CYAN)
+
+# ── Load data ───────────────────────────────────────────────
+# Data was downloaded from OSM via osmdata / osmnx
+# Saved to data/harare_water.geojson
+water <- st_read(here::here("data/harare_water.geojson"), quiet = TRUE)
+
+# Reproject for accurate area
+water_utm <- st_transform(water, crs = 32736)
+water_utm$area_m2  <- as.numeric(st_area(water_utm))
+water_utm$area_ha  <- round(water_utm$area_m2 / 1e4, 4)
+water_utm$area_km2 <- round(water_utm$area_m2 / 1e6, 6)
+
+water_utm$size_class <- cut(
+  water_utm$area_m2,
+  breaks = c(0, 1e3, 1e4, 1e5, 1e6, Inf),
+  labels = c("Tiny (<0.1 ha)","Small (0.1–1 ha)","Medium (1–10 ha)",
+             "Large (10–100 ha)","Very Large (>100 ha)"),
+  right = FALSE
+)
+
+water <- water_utm |> st_transform(4326)
+
+theme_osm <- function() {
+  theme_minimal(base_family = "Inter", base_size = 11) +
+  theme(
+    plot.background  = element_rect(fill = BG, colour = NA),
+    panel.background = element_rect(fill = CARD, colour = NA),
+    panel.grid.major = element_line(colour = "#334155"),
+    panel.grid.minor = element_blank(),
+    text             = element_text(colour = TEXT),
+    axis.text        = element_text(colour = TEXT, size = 8),
+    plot.title       = element_text(colour = "#e2e8f0", face = "bold", size = 13),
+    plot.subtitle    = element_text(colour = TEXT, size = 9),
+    legend.background = element_rect(fill = CARD, colour = NA),
+    legend.text      = element_text(colour = TEXT),
+    strip.text       = element_text(colour = "#e2e8f0")
+  )
+}
+```
+
+---
+
+## Introduction & Motivation
+
+::: {.callout-note}
+**Project context:** This journal documents the exploratory spatial analysis of water bodies in the Harare metropolitan area, extracted from OpenStreetMap (OSM). The work is part of the *Downloading OSM Data in R* project, which provides a reproducible toolkit for querying, processing, and visualizing hydrological features anywhere in the world.
+:::
+
+Water bodies in and around Harare — from the vast Lake Chivero that supplies much of the city's drinking water, to small neighbourhood ponds and seasonal wetlands — vary enormously in size, purpose, and spatial distribution. Understanding that variation matters for urban water planning, ecological assessment, and infrastructure resilience.
+
+This analysis addresses three questions:
+
+1. **How are water bodies distributed by size and type?** Is the distribution dominated by a few large features or spread across many small ones?
+2. **How are they distributed in space?** Are they clustered, dispersed, or random?
+3. **What does the area inequality look like?** A Gini/Lorenz approach borrowed from economics gives us a concise answer.
+
+---
+
+## Data
+
+Data were downloaded from OpenStreetMap using the `osmdata` R package (or `osmnx` in Python). The query captured all features tagged `natural=water` and `landuse=reservoir` within the Harare metro bounding box (`-18.0 / 30.9 / -17.6 / 31.3`).
+
+```{r data-summary}
+water |>
+  st_drop_geometry() |>
+  select(name, feature_type, water, area_ha, size_class) |>
+  arrange(desc(area_ha)) |>
+  datatable(
+    options = list(pageLength = 10, scrollX = TRUE,
+                   dom = "frtip",
+                   initComplete = JS("function(s,d) {
+                     $(s.nTable()).css({'color':'#94a3b8','background':'#0f172a'});
+                   }")),
+    rownames = FALSE,
+    class = "compact stripe",
+    colnames = c("Name","Type","Sub-type","Area (ha)","Size Class")
+  )
+```
+
+### Dataset at a glance
+
+```{r kpi-cards, results='asis'}
+total_n    <- nrow(water)
+total_ha   <- round(sum(water$area_ha), 1)
+mean_ha    <- round(mean(water$area_ha), 2)
+median_ha  <- round(median(water$area_ha), 2)
+largest    <- water |> st_drop_geometry() |> slice_max(area_ha, n=1) |> pull(name)
+largest_ha <- round(max(water$area_ha), 1)
+
+cat(glue::glue("
+<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1.5rem 0'>
+  <div style='background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1rem'>
+    <div style='font-size:2rem;font-weight:700;color:#38bdf8'>{total_n}</div>
+    <div style='font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em'>Total Features</div>
+  </div>
+  <div style='background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1rem'>
+    <div style='font-size:2rem;font-weight:700;color:#38bdf8'>{total_ha} ha</div>
+    <div style='font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em'>Total Water Area</div>
+  </div>
+  <div style='background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1rem'>
+    <div style='font-size:2rem;font-weight:700;color:#38bdf8'>{largest_ha} ha</div>
+    <div style='font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em'>Largest — {largest}</div>
+  </div>
+</div>
+"))
+```
+
+---
+
+## Spatial Distribution
+
+### Interactive Map
+
+```{r leaflet-map}
+pal <- colorFactor(
+  palette = unname(TYPE_COL),
+  domain  = names(TYPE_COL)
+)
+
+leaflet(water) |>
+  addProviderTiles("CartoDB.DarkMatter") |>
+  addPolygons(
+    color       = ~pal(feature_type),
+    fillColor   = ~pal(feature_type),
+    fillOpacity = 0.6,
+    weight      = 1,
+    popup = ~paste0(
+      "<div style='font-family:monospace;font-size:12px'>",
+      "<b style='color:#38bdf8'>", name, "</b><br>",
+      "Type: ", feature_type, " | Sub: ", water, "<br>",
+      "Area: <b>", round(area_ha, 3), " ha</b>",
+      "</div>"
+    ),
+    label = ~name,
+    highlightOptions = highlightOptions(
+      color="#ffffff", weight=3, fillOpacity=0.85, bringToFront=TRUE
+    )
+  ) |>
+  addLegend(position="bottomright", pal=pal, values=~feature_type,
+            title="Feature Type", opacity=0.9) |>
+  addScaleBar(position="bottomleft") |>
+  addFullscreenControl()
+```
+
+### Nearest-Neighbour Analysis
+
+To characterise spatial dispersion, I computed the nearest-neighbour (NN) distance between all feature centroids using UTM 36S coordinates.
+
+```{r nn-analysis}
+centroids <- water |> st_transform(32736) |> st_centroid()
+coords    <- st_coordinates(centroids)
+dist_mat  <- as.matrix(dist(coords)) / 1000   # km
+
+# Extract NN (exclude self: diagonal = 0, so second smallest per row)
+nn_dist <- apply(dist_mat, 1, function(r) sort(r)[2])
+
+cat("Mean NN distance  :", round(mean(nn_dist), 2), "km\n")
+cat("Median NN distance:", round(median(nn_dist), 2), "km\n")
+cat("Max NN distance   :", round(max(nn_dist), 2), "km\n")
+```
+
+```{r nn-plot}
+nn_df <- data.frame(nn_km = nn_dist, name = water$name)
+
+p <- ggplot(nn_df, aes(x = nn_km)) +
+  geom_histogram(bins = 8, fill = CYAN, colour = BG, alpha = .85) +
+  geom_vline(xintercept = mean(nn_dist), colour = AMBE,
+             linetype = "dashed", linewidth = 1) +
+  annotate("text", x = mean(nn_dist) + .15, y = Inf, vjust = 1.5,
+           label = paste0("Mean = ", round(mean(nn_dist),1), " km"),
+           colour = AMBE, size = 3.5) +
+  labs(title = "Nearest-Neighbour Distance Distribution",
+       subtitle = "Distance from each water body to its closest neighbour",
+       x = "Distance (km)", y = "Count") +
+  theme_osm()
+
+ggplotly(p, tooltip = c("x","y")) |>
+  layout(paper_bgcolor=BG, plot_bgcolor=CARD,
+         font=list(color=TEXT))
+```
+
+::: {.callout-tip title="Interpretation"}
+A mean NN distance of **`r round(mean(nn_dist),1)` km** suggests moderate clustering — water bodies tend to group within a few kilometres of each other, which makes sense given the topography of the Harare plateau and the river valleys that drain it. The long tail in the histogram reflects isolated ponds on the urban fringe.
+:::
+
+---
+
+## Size Distribution Analysis
+
+### Log-Normal Character
+
+Water body areas commonly follow a log-normal distribution — a small number of very large features dominate total area while many small features account for little. Let's test this visually.
+
+```{r area-distribution}
+p1 <- ggplot(water, aes(x = log10(area_ha))) +
+  geom_histogram(bins = 12, fill = BLUE, colour = BG, alpha = .85) +
+  stat_function(
+    fun  = function(x) dnorm(x, mean(log10(water$area_ha)),
+                              sd(log10(water$area_ha))) *
+           nrow(water) * diff(range(log10(water$area_ha))) / 12,
+    colour = AMBE, linewidth = 1.2, linetype = "dashed"
+  ) +
+  labs(title = "Area Distribution (log₁₀ scale)",
+       subtitle = "Dashed = fitted normal on log scale",
+       x = "log₁₀(Area / ha)", y = "Count") +
+  theme_osm()
+
+ggplotly(p1) |> layout(paper_bgcolor=BG, plot_bgcolor=CARD, font=list(color=TEXT))
+```
+
+```{r area-by-type}
+p2 <- ggplot(water, aes(x = feature_type, y = area_ha, fill = feature_type)) +
+  geom_boxplot(alpha = .75, colour = "#e2e8f0", outlier.colour = AMBE,
+               outlier.size = 2) +
+  scale_fill_manual(values = TYPE_COL) +
+  scale_y_log10() +
+  labs(title = "Area by Feature Type", y = "Area (ha) — log scale", x = NULL) +
+  theme_osm() + theme(legend.position = "none")
+
+ggplotly(p2) |> layout(paper_bgcolor=BG, plot_bgcolor=CARD, font=list(color=TEXT))
+```
+
+### Size Class Breakdown
+
+```{r size-class}
+sc_counts <- water |>
+  st_drop_geometry() |>
+  count(size_class, .drop = FALSE) |>
+  mutate(pct = round(n / sum(n) * 100, 1))
+
+p3 <- ggplot(sc_counts, aes(x = size_class, y = n, fill = size_class)) +
+  geom_col(show.legend = FALSE, colour = BG, width = .7) +
+  geom_text(aes(label = paste0(n, " (", pct, "%)")),
+            vjust = -.4, colour = TEXT, size = 3.2) +
+  scale_fill_manual(values = c(PURP, BLUE, CYAN, GREN, AMBE)) +
+  labs(title = "Feature Count by Size Class", x = NULL, y = "Count") +
+  theme_osm() +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))
+
+ggplotly(p3) |> layout(paper_bgcolor=BG, plot_bgcolor=CARD, font=list(color=TEXT))
+```
+
+---
+
+## Area Inequality — Lorenz Curve & Gini Coefficient
+
+Borrowing from economics, the **Lorenz curve** maps the cumulative share of features (ranked by area) against their cumulative share of total area. The **Gini coefficient** (0 = perfect equality, 1 = total concentration) summarises the curve in one number.
+
+```{r lorenz}
+sorted_areas <- sort(water$area_ha)
+n            <- length(sorted_areas)
+cum_area     <- cumsum(sorted_areas) / sum(sorted_areas)
+pop_share    <- seq_len(n) / n
+gini         <- 1 - 2 * pracma::trapz(pop_share, cum_area)
+
+lorenz_df <- data.frame(
+  pop   = c(0, pop_share),
+  area  = c(0, cum_area),
+  equal = c(0, pop_share)
+)
+
+p4 <- ggplot(lorenz_df) +
+  geom_ribbon(aes(x = pop, ymin = area, ymax = equal), fill = BLUE, alpha = .15) +
+  geom_line(aes(x = pop, y = area),  colour = BLUE,  linewidth = 1.5, label="Observed") +
+  geom_line(aes(x = pop, y = equal), colour = "#475569", linewidth = 1,
+            linetype = "dashed") +
+  annotate("text", x = .1, y = .92,
+           label = paste0("Gini = ", round(gini, 3)),
+           colour = AMBE, size = 5, fontface = "bold") +
+  labs(title = "Lorenz Curve — Water Body Area Inequality",
+       subtitle = "Blue shading = area of inequality; dashed = perfect equality",
+       x = "Cumulative share of features",
+       y = "Cumulative share of total area") +
+  theme_osm()
+
+ggplotly(p4) |> layout(paper_bgcolor=BG, plot_bgcolor=CARD, font=list(color=TEXT))
+```
+
+::: {.callout-important title="Key finding"}
+**Gini = `r round(gini, 3)`** — this is a highly unequal distribution. Lake Chivero alone accounts for roughly **`r round(max(water$area_ha)/sum(water$area_ha)*100, 0)`%** of the total mapped water surface area. The many small ponds and wetlands, while ecologically important, contribute very little to the total area tally.
+:::
+
+---
+
+## Spatial Autocorrelation — Moran's I
+
+Does the *size* of a water body predict the size of its neighbours? A positive Moran's I would suggest that large features cluster together (e.g. along river valleys), while negative values indicate spatial dispersion.
+
+```{r morans-i}
+tryCatch({
+  nb <- knn2nb(knearneigh(coords, k = 4))
+  lw <- nb2listw(nb, style = "W")
+  mi <- moran.test(log1p(water$area_m2), lw)
+
+  cat("Moran's I statistic :", round(mi$estimate["Moran I statistic"], 4), "\n")
+  cat("Expected value       :", round(mi$estimate["Expectation"], 4), "\n")
+  cat("Variance             :", round(mi$estimate["Variance"], 6), "\n")
+  cat("p-value              :", signif(mi$p.value, 3), "\n")
+  cat("\nConclusion:", ifelse(mi$p.value < 0.05,
+      "Significant spatial autocorrelation — water body sizes cluster in space.",
+      "No significant autocorrelation — sizes are spatially random."))
+}, error = function(e) {
+  cat("Moran's I requires >= 8 features with valid neighbours.\n")
+  cat("Error:", e$message, "\n")
+})
+```
+
+---
+
+## Summary Statistics
+
+```{r summary-table}
+water |>
+  st_drop_geometry() |>
+  group_by(`Feature Type` = feature_type, `Sub-type` = water) |>
+  summarise(
+    Count        = n(),
+    `Total (ha)` = round(sum(area_ha), 2),
+    `Mean (ha)`  = round(mean(area_ha), 3),
+    `Median (ha)`= round(median(area_ha), 3),
+    `Max (ha)`   = round(max(area_ha), 2),
+    .groups = "drop"
+  ) |>
+  datatable(options = list(dom = "t", pageLength = 20),
+            rownames = FALSE, class = "compact stripe")
+```
+
+---
+
+## Journal Notes
+
+### Entry — `r Sys.Date()`
+
+**What I did today:**
+
+- Fetched fresh OSM data for Harare metro using the `osmdata` package, querying both `natural=water` and `landuse=reservoir` features within the bounding box `[-18.0, 30.9, -17.6, 31.3]`.
+- Reprojected to UTM 36S (EPSG:32736) for accurate area calculation — the default WGS-84 areas in degrees² are meaningless for anything metric.
+- Added size classification, Lorenz/Gini analysis, nearest-neighbour distances, and Moran's I.
+
+**What surprised me:**
+
+- The Gini coefficient of **`r round(gini, 3)`** is striking. I expected inequality but not this extreme — it's higher than most country-level income Gini scores. Lake Chivero just dominates everything.
+- The mean NN distance of ~3 km is consistent with the drainage network structure. Water bodies aren't random — they follow the topography of the plateau and its valleys.
+
+**What I want to add next:**
+
+- [ ] Seasonal change analysis — compare OSM data with Sentinel-2 NDWI to detect which water bodies shrink in the dry season
+- [ ] Watershed delineation — use a DEM (SRTM) to delineate contributing catchments
+- [ ] Population within 1 km buffer — how many Harare residents live near a mapped water body?
+- [ ] Temporal OSM history — use the Overpass API's `[date]` filter to see how mapped water bodies have changed over time (2015 → 2025)
+- [ ] Comparison with other Zimbabwean cities (Bulawayo, Mutare, Gweru)
+
+**Technical notes:**
+
+- `rmapshaper::ms_simplify(keep = 0.05)` is aggressive but necessary for the Shiny app performance. For a static analysis like this journal, use `keep = 0.25` for better-looking polygons.
+- `spdep::knn2nb` with `k = 4` is the minimum sensible setting for Moran's I with sparse data. With only 20 features, treat the autocorrelation result cautiously.
+- The `here::here()` package for paths makes the project fully portable — no more hardcoded `C:/Users/anesu/...` paths.
+
+---
+
+## References
+
+- Padgham M et al. (2017). *osmdata*. Journal of Open Source Software, 2(14), 305.
+- OpenStreetMap contributors (2024). *OpenStreetMap data for Zimbabwe*. openstreetmap.org
+- Pebesma E (2018). *Simple Features for R*. The R Journal 10(1), 439–446.
+- Rey SJ, Anselin L (2010). *PySAL: A Python Library of Spatial Analytical Methods*. Review of Regional Studies 37(1), 5–27.
+
+---
+
+*Analysis by Anesu Chimbi · `r format(Sys.Date(), "%B %Y")` · [GitHub](https://github.com/Anesu-Chimbi/Downloading-OSM-data-in-R)*
